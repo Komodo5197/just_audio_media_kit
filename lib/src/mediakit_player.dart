@@ -79,7 +79,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// changing the currently playing track.
   int get _playingVirtualIndex {
     if (_nativeQueueOrder.isEmpty) return 0;
-    int playlistIndex = _playlistIndexOverride ?? _nativeQueueOrder[_player.state.playlist.index];
+    int playlistIndex = _playlistIndexOverride ??
+        _nativeQueueOrder[_player.state.playlist.index];
     return _isShuffling ? _shuffleOrder.indexOf(playlistIndex) : playlistIndex;
   }
 
@@ -99,7 +100,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   Duration get _duration {
     final media = _currentMedia;
-    if (media?.extras?['overrideDuration'] != null) return media?.extras?['overrideDuration'];
+    if (media?.extras?['overrideDuration'] != null)
+      return media?.extras?['overrideDuration'];
     Duration duration = media?.end ?? _player.state.duration;
     final start = media?.start;
     if (start != null) duration -= start;
@@ -109,7 +111,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// The playlist index of the last track in the virtual queue.  This is used as the reported playback index when the
   /// playlist is not empty but the native queue is, which indicates playback has completed.  Using this value instead
   /// of 0 in that scenario should avoid jumps, as it should always match the last real value reported.
-  int get _completedIndex => _isShuffling ? _shuffleOrder.lastOrNull ?? 0 : max(0, (_playlist?.length ?? 0) - 1);
+  int get _completedIndex => _isShuffling
+      ? _shuffleOrder.lastOrNull ?? 0
+      : max(0, (_playlist?.length ?? 0) - 1);
 
   MediaKitPlayer(super.id) {
     _player = Player(
@@ -125,6 +129,10 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
     if (JustAudioMediaKit.prefetchPlaylist) {
       setProperty(_player, 'prefetch-playlist', 'yes');
+    }
+
+    if (JustAudioMediaKit.nullBackend) {
+      setProperty(_player, 'ao', 'null');
     }
 
     _streamSubscriptions = [
@@ -156,7 +164,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
         _errorMessage = null;
         if (completed) {
           // If not looping and at end of virtual Queue, set state to completed.
-          if (_virtualIndex + 1 == (_playlist?.length ?? 0) && _player.state.playlistMode == PlaylistMode.none) {
+          if (_virtualIndex + 1 == (_playlist?.length ?? 0) &&
+              _player.state.playlistMode == PlaylistMode.none) {
             _processingState = ProcessingStateMessage.completed;
           }
           // Start playing next media after current media got completed.
@@ -180,7 +189,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
         _updatePlaybackEvent();
       }),
       _player.stream.playlistMode.listen((playlistMode) {
-        _dataController.add(PlayerDataMessage(loopMode: _playlistModeToLoopMode(playlistMode)));
+        _dataController.add(
+            PlayerDataMessage(loopMode: _playlistModeToLoopMode(playlistMode)));
       }),
       _player.stream.pitch.listen((pitch) {
         _dataController.add(PlayerDataMessage(pitch: pitch));
@@ -189,8 +199,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
         _dataController.add(PlayerDataMessage(speed: rate));
       }),
       _player.stream.log.listen((event) {
-        final mpvLevel =
-            MPVLogLevel.values.firstWhere((x) => x.name == event.level, orElse: () => JustAudioMediaKit.mpvLogLevel);
+        final mpvLevel = MPVLogLevel.values.firstWhere(
+            (x) => x.name == event.level,
+            orElse: () => JustAudioMediaKit.mpvLogLevel);
         final logLevel = switch (mpvLevel) {
           MPVLogLevel.error => Level.SEVERE,
           MPVLogLevel.warn => Level.WARNING,
@@ -235,13 +246,17 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     if (nativeIndex == 0) {
       // We should be in the transition between tracks 0 and 1.  This is the expected timing.
       assert(_position + const Duration(seconds: 1) > _duration);
-      return await _setNativeQueue(_nativeQueueVirtualOffset! + 1, forcePrefetch: true);
+      return await _setNativeQueue(_nativeQueueVirtualOffset! + 1,
+          forcePrefetch: true);
     } else if (nativeIndex == 1 && _position < const Duration(seconds: 1)) {
-      _logger.warning("_advanceNativeQueue called after playback of next track has already started");
+      _logger.warning(
+          "_advanceNativeQueue called after playback of next track has already started");
       // We have been called slightly late.  There may be a hitch in playback as we update the queue and reset the current track.
-      return await _setNativeQueue(_nativeQueueVirtualOffset! + 1, forcePrefetch: true);
+      return await _setNativeQueue(_nativeQueueVirtualOffset! + 1,
+          forcePrefetch: true);
     } else {
-      _logger.severe("_advanceNativeQueue called with unexpected native index $nativeIndex at position $_position");
+      _logger.severe(
+          "_advanceNativeQueue called with unexpected native index $nativeIndex at position $_position");
       // We have been called at an unexpected time.  Do not forcePretetch to avoid resetting song position.
       return await _setNativeQueue(_virtualIndex, forcePrefetch: false);
     }
@@ -254,13 +269,15 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// track and forcePrefetch is not true, the native queue will be modified with the new values.  This avoids interrupting
   /// playback but does not trigger prefetching.  Otherwise, the whole queue will be replaced, which triggers prefetching
   /// of the new values but still uses the old queue's prefetched tracks, if applicable.
-  Future<void> _setNativeQueue(int newVirtualIndex, {bool forcePrefetch = false}) async {
+  Future<void> _setNativeQueue(int newVirtualIndex,
+      {bool forcePrefetch = false}) async {
     if (_playlist == null) return;
 
     newVirtualIndex = newVirtualIndex.clamp(0, _playlist!.length);
 
     // Select the next [prefetchPlaylistSize] that will play, looping back to 0 if in loop mode.
-    List<int> virtualQueue = List.generate(JustAudioMediaKit.prefetchPlaylistSize, (x) => x + newVirtualIndex);
+    List<int> virtualQueue = List.generate(
+        JustAudioMediaKit.prefetchPlaylistSize, (x) => x + newVirtualIndex);
     if (_player.state.playlistMode == PlaylistMode.loop) {
       virtualQueue = virtualQueue.map((x) => x % _playlist!.length).toList();
     } else {
@@ -286,7 +303,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       _nativeQueueLock = Completer();
       // If newNativeQueue is empty, we just completed the playlist with looping disabled.  Continue to use the index
       // of the last track in the virtual queue to avoid jumps.
-      _playlistIndexOverride = newNativeQueue.isEmpty ? _completedIndex : newNativeQueue[0];
+      _playlistIndexOverride =
+          newNativeQueue.isEmpty ? _completedIndex : newNativeQueue[0];
       // If the new current song matches the existing current song and !forcePrefetch, use the queue update algorithm
       // instead of replacing the whole queue.  This avoids interrupting playback of the current track and resetting its
       // play position, but does not result in the new upcoming track being prefetched.
@@ -298,7 +316,10 @@ class MediaKitPlayer extends AudioPlayerPlatform {
         int validUpcomingIndex = 0;
         // Find out how many upcoming tracks match the new queue
         // We can skip 0 as its already been checked
-        for (int i = 1; i < newNativeQueue.length && currentIndex + i < _nativeQueueOrder.length; i++) {
+        for (int i = 1;
+            i < newNativeQueue.length &&
+                currentIndex + i < _nativeQueueOrder.length;
+            i++) {
           if (_nativeQueueOrder[currentIndex + i] == newNativeQueue[i]) {
             validUpcomingIndex = currentIndex + i;
           } else {
@@ -348,10 +369,12 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Stream<PlaybackEventMessage> get playbackEventMessageStream => _eventController.stream;
+  Stream<PlaybackEventMessage> get playbackEventMessageStream =>
+      _eventController.stream;
 
   @override
-  Stream<PlayerDataMessage> get playerDataMessageStream => _dataController.stream;
+  Stream<PlayerDataMessage> get playerDataMessageStream =>
+      _dataController.stream;
 
   /// Updates the playback event with the current state of the player.
   void _updatePlaybackEvent() {
@@ -365,7 +388,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       currentIndex: _playlist == null
           ? 0
           : (_playlistIndexOverride ??
-                  (_nativeQueueOrder.isEmpty ? _completedIndex : _nativeQueueOrder[_player.state.playlist.index]))
+                  (_nativeQueueOrder.isEmpty
+                      ? _completedIndex
+                      : _nativeQueueOrder[_player.state.playlist.index]))
               .clamp(0, _playlist!.length),
       androidAudioSessionId: null,
       errorCode: _errorCode,
@@ -385,19 +410,23 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     _updatePlaybackEvent();
 
     if (request.audioSourceMessage is ConcatenatingAudioSourceMessage) {
-      final audioSource = request.audioSourceMessage as ConcatenatingAudioSourceMessage;
+      final audioSource =
+          request.audioSourceMessage as ConcatenatingAudioSourceMessage;
 
       _shuffleOrder = audioSource.shuffleOrder;
-      _playlist = audioSource.children.map(_convertAudioSourceToMediaKit).toList();
+      _playlist =
+          audioSource.children.map(_convertAudioSourceToMediaKit).toList();
     } else {
-      final playable = _convertAudioSourceToMediaKit(request.audioSourceMessage);
+      final playable =
+          _convertAudioSourceToMediaKit(request.audioSourceMessage);
 
       _logger.finest('playable is ${playable.toString()}');
       _playlist = [playable];
     }
 
     final requestIndex = request.initialIndex ?? 0;
-    await _setNativeQueue(_isShuffling ? _shuffleOrder.indexOf(requestIndex) : requestIndex);
+    await _setNativeQueue(
+        _isShuffling ? _shuffleOrder.indexOf(requestIndex) : requestIndex);
 
     _updatePlaybackEvent();
     final duration = await _loadCompleter?.future;
@@ -460,8 +489,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
     _isShuffling = request.shuffleMode != ShuffleModeMessage.none;
 
-    _dataController
-        .add(PlayerDataMessage(shuffleMode: _isShuffling ? ShuffleModeMessage.all : ShuffleModeMessage.none));
+    _dataController.add(PlayerDataMessage(
+        shuffleMode:
+            _isShuffling ? ShuffleModeMessage.all : ShuffleModeMessage.none));
 
     if (_isShuffling != oldIsShuffling) {
       await _setNativeQueue(_playingVirtualIndex);
@@ -489,8 +519,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   Future<SeekResponse> seek(SeekRequest request) async {
     _logger.finest('seek(${request.toMap()})');
 
-    final requestVirtualIndex =
-        request.index != null && _isShuffling ? _shuffleOrder.indexOf(request.index!) : request.index;
+    final requestVirtualIndex = request.index != null && _isShuffling
+        ? _shuffleOrder.indexOf(request.index!)
+        : request.index;
     if (requestVirtualIndex != null && requestVirtualIndex != _virtualIndex) {
       await _setNativeQueue(requestVirtualIndex);
     }
@@ -513,12 +544,14 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(ConcatenatingInsertAllRequest request) async {
+  Future<ConcatenatingInsertAllResponse> concatenatingInsertAll(
+      ConcatenatingInsertAllRequest request) async {
     _logger.fine('concatenatingInsertAll(${request.toMap()})');
 
     _shuffleOrder = request.shuffleOrder;
 
-    _playlist!.insertAll(request.index, request.children.map((x) => _convertAudioSourceToMediaKit(x)));
+    _playlist!.insertAll(request.index,
+        request.children.map((x) => _convertAudioSourceToMediaKit(x)));
 
     int calculateOffset(int x) {
       if (x >= request.index) {
@@ -535,7 +568,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(ConcatenatingRemoveRangeRequest request) async {
+  Future<ConcatenatingRemoveRangeResponse> concatenatingRemoveRange(
+      ConcatenatingRemoveRangeRequest request) async {
     _logger.fine('concatenatingRemoveRange(${request.toMap()})');
     assert(_playlist != null);
 
@@ -618,10 +652,12 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       //   );
 
       case final ClippingAudioSourceMessage clippingSource:
-        return Media(clippingSource.child.uri, start: clippingSource.start, end: clippingSource.end);
+        return Media(clippingSource.child.uri,
+            start: clippingSource.start, end: clippingSource.end);
 
       default:
-        throw UnsupportedError('${audioSource.runtimeType} is currently not supported');
+        throw UnsupportedError(
+            '${audioSource.runtimeType} is currently not supported');
     }
   }
 

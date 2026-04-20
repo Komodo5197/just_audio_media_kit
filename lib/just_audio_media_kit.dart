@@ -52,6 +52,10 @@ class JustAudioMediaKit extends JustAudioPlatform {
   /// [prefetchPlaylistSize] can be changed to set the amount of items to prefetch.
   static bool prefetchPlaylist = false;
 
+  /// Switches MPV to use a null backend with no output.
+  /// Useful for running tests in CI without audio drivers.
+  static bool nullBackend = false;
+
   /// Max amount of items to prefetch in the playlist.
   ///
   /// Does nothing, if [prefetchPlaylist] is set to false. Default is 3.
@@ -96,7 +100,8 @@ class JustAudioMediaKit extends JustAudioPlatform {
   @override
   Future<AudioPlayerPlatform> init(InitRequest request) async {
     if (_players.containsKey(request.id)) {
-      throw PlatformException(code: 'error', message: 'Player ${request.id} already exists!');
+      throw PlatformException(
+          code: 'error', message: 'Player ${request.id} already exists!');
     }
 
     _logger.fine('instantiating new player ${request.id}');
@@ -108,7 +113,8 @@ class JustAudioMediaKit extends JustAudioPlatform {
   }
 
   @override
-  Future<DisposePlayerResponse> disposePlayer(DisposePlayerRequest request) async {
+  Future<DisposePlayerResponse> disposePlayer(
+      DisposePlayerRequest request) async {
     _logger.fine('disposing player ${request.id}');
 
     // temporary workaround because disposePlayer is called more than once
@@ -119,7 +125,8 @@ class JustAudioMediaKit extends JustAudioPlatform {
     }
 
     if (!_players.containsKey(request.id)) {
-      throw PlatformException(code: 'error', message: 'Player ${request.id} doesn\'t exist.');
+      throw PlatformException(
+          code: 'error', message: 'Player ${request.id} doesn\'t exist.');
     }
 
     final future = _players[request.id]!.release();
@@ -133,7 +140,8 @@ class JustAudioMediaKit extends JustAudioPlatform {
   }
 
   @override
-  Future<DisposeAllPlayersResponse> disposeAllPlayers(DisposeAllPlayersRequest request) async {
+  Future<DisposeAllPlayersResponse> disposeAllPlayers(
+      DisposeAllPlayersRequest request) async {
     _logger.fine('disposing of all players...');
     if (_players.isNotEmpty) {
       await Future.wait(_players.values.map((e) => e.release()));
