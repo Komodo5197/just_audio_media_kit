@@ -130,6 +130,12 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     if (JustAudioMediaKit.prefetchPlaylist) {
       setProperty(_player, 'prefetch-playlist', 'yes');
     }
+    if (JustAudioMediaKit.tlsCertFile != null) {
+      setProperty(_player, 'tls-cert-file', JustAudioMediaKit.tlsCertFile!);
+    }
+    if (JustAudioMediaKit.tlsKeyFile != null) {
+      setProperty(_player, 'tls-key-file', JustAudioMediaKit.tlsKeyFile!);
+    }
 
     if (JustAudioMediaKit.nullBackend) {
       setProperty(_player, 'ao', 'null');
@@ -423,6 +429,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       _logger.finest('playable is ${playable.toString()}');
       _playlist = [playable];
     }
+
+    // Mark all native tracks as invalid due to new playlist
+    _nativeQueueOrder = _nativeQueueOrder.map((_) => -1).toList();
 
     final requestIndex = request.initialIndex ?? 0;
     await _setNativeQueue(
